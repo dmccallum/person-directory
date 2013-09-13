@@ -30,7 +30,7 @@ import org.jasig.services.persondir.util.Util;
  * @author andrew.petro@yale.edu
  * @version $Revision$ $Date$
  */
-public class MultivaluedAttributeMergerTest extends AbstractAttributeMergerTest {
+public class MultivaluedAttributeMergerTest extends BaseAdditiveAttributeMergerTest {
 
     private MultivaluedAttributeMerger adder = new MultivaluedAttributeMerger();
 
@@ -133,6 +133,6 @@ public class MultivaluedAttributeMergerTest extends AbstractAttributeMergerTest 
      */
     @Override
     protected IAttributeMerger getAttributeMerger() {
-        return new MultivaluedAttributeMerger();
+        return adder;
     }
 }

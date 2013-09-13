@@ -38,9 +38,12 @@ import org.jasig.services.persondir.support.NamedPersonImpl;
  * @version $Revision$
  */
 public abstract class BaseAdditiveAttributeMerger implements IAttributeMerger {
+
+    private boolean caseSensitiveUsernames = true;
+
     /* (non-Javadoc)
-     * @see org.jasig.services.persondir.support.merger.IAttributeMerger#mergeAvailableQueryAttributes(java.util.Set, java.util.Set)
-     */
+         * @see org.jasig.services.persondir.support.merger.IAttributeMerger#mergeAvailableQueryAttributes(java.util.Set, java.util.Set)
+         */
     public Set<String> mergeAvailableQueryAttributes(Set<String> toModify, Set<String> toConsider) {
         toModify.addAll(toConsider);
         return toModify;
@@ -64,17 +67,21 @@ public abstract class BaseAdditiveAttributeMerger implements IAttributeMerger {
         //Convert the toModify Set into a Map to allow for easier lookups
         final Map<String, IPersonAttributes> toModfyPeople = new LinkedHashMap<String, IPersonAttributes>();
         for (final IPersonAttributes toModifyPerson : toModify) {
-            toModfyPeople.put(toModifyPerson.getName(), toModifyPerson);
+            toModfyPeople.put(usernameFrom(toModifyPerson), toModifyPerson);
         }
         
         //Merge in the toConsider people
         for (final IPersonAttributes toConsiderPerson : toConsider) {
-            final String toConsiderName = toConsiderPerson.getName();
+            final String toConsiderName = usernameFrom(toConsiderPerson);
             final IPersonAttributes toModifyPerson = toModfyPeople.get(toConsiderName);
             
-            //No matching toModify person, just add the new person
+            //No matching toModify person, just add the new person, but make sure we return usernames consistently
             if (toModifyPerson == null) {
-                toModify.add(toConsiderPerson);
+                if ( toConsiderName.equals(toConsiderPerson.getName()) ) {
+                    toModify.add(toConsiderPerson);
+                } else {
+                    toModify.add(new NamedPersonImpl(toConsiderName, toConsiderPerson.getAttributes()));
+                }
             }
             //Matching toModify person, merge their attributes
             else {
@@ -90,7 +97,18 @@ public abstract class BaseAdditiveAttributeMerger implements IAttributeMerger {
         
         return toModify;
     }
-    
+
+    protected String usernameFrom(IPersonAttributes person) {
+        if ( !(isCaseSensitiveUsernames()) ) {
+            return normalizeCasing(person.getName());
+        }
+        return person.getName();
+    }
+
+    protected String normalizeCasing(String name) {
+        return name.toLowerCase();
+    }
+
     /**
      * Do a deep clone of an attribute Map to ensure it is completley mutable.
      */
@@ -137,5 +155,13 @@ public abstract class BaseAdditiveAttributeMerger implements IAttributeMerger {
      */
     public Map<String, List<Object>> mergeAttributes(Map<String, List<Object>> toModify, Map<String, List<Object>> toConsider) {
         return this.mergePersonAttributes(toModify, toConsider);
+    }
+
+    public boolean isCaseSensitiveUsernames() {
+        return caseSensitiveUsernames;
+    }
+
+    public void setCaseSensitiveUsernames(boolean caseSensitiveUsernames) {
+        this.caseSensitiveUsernames = caseSensitiveUsernames;
     }
 }

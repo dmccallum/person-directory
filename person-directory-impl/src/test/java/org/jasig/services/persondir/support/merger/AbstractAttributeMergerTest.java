@@ -21,6 +21,9 @@ package org.jasig.services.persondir.support.merger;
 
 import java.util.HashMap;
 import java.util.List;
+import java.util.Set;
+
+import org.jasig.services.persondir.IPersonAttributes;
 
 import junit.framework.TestCase;
 
@@ -58,7 +61,7 @@ public abstract class AbstractAttributeMergerTest extends TestCase {
         }
         fail("Should have thrown IAE on null argument.");
     }
-    
+
     protected abstract IAttributeMerger getAttributeMerger();
     
 }

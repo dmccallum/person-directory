@@ -30,7 +30,7 @@ import org.jasig.services.persondir.util.Util;
  * @author andrew.petro@yale.edu
  * @version $Revision$ $Date$
  */
-public class NoncollidingAttributeAdderTest extends AbstractAttributeMergerTest {
+public class NoncollidingAttributeAdderTest extends BaseAdditiveAttributeMergerTest {
 
     private NoncollidingAttributeAdder adder = new NoncollidingAttributeAdder();
 
@@ -98,7 +98,7 @@ public class NoncollidingAttributeAdderTest extends AbstractAttributeMergerTest 
      */
     @Override
     protected IAttributeMerger getAttributeMerger() {
-        return new NoncollidingAttributeAdder();
+        return adder;
     }
     
 }

@@ -30,7 +30,7 @@ import org.jasig.services.persondir.util.Util;
  * @author andrew.petro@yale.edu
  * @version $Revision$ $Date$
  */
-public class ReplacingAttributeAdderTest extends AbstractAttributeMergerTest {
+public class ReplacingAttributeAdderTest extends BaseAdditiveAttributeMergerTest {
 
     private ReplacingAttributeAdder adder = new ReplacingAttributeAdder();
     
@@ -60,7 +60,7 @@ public class ReplacingAttributeAdderTest extends AbstractAttributeMergerTest {
      */
     @Override
     protected IAttributeMerger getAttributeMerger() {
-        return new ReplacingAttributeAdder();
+        return adder;
     }
 
 }
