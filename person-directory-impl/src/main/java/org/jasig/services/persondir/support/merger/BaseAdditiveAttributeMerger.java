@@ -90,7 +90,7 @@ public abstract class BaseAdditiveAttributeMerger implements IAttributeMerger {
                 final NamedPersonImpl mergedPerson = new NamedPersonImpl(toConsiderName, mergedAttributes);
                 
                 //Remove then re-add the mergedPerson entry
-                toModify.remove(mergedPerson);
+                toModify.remove(toModifyPerson);
                 toModify.add(mergedPerson);
             }
         }
