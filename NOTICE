@@ -17,7 +17,7 @@ under the License.
 
 This project includes:
   AntLR under BSD License
-  AOP alliance under Public Domain
+  AOP alliance under GNU Lesser General Public License
   Apache Directory ASN.1 Shared under Apache Software License 2.0
   Apache Directory MINA ASN.1 Codec Shared under Apache Software License 2.0
   Apache Directory Protocol Ldap Shared under Apache 2.0 License
