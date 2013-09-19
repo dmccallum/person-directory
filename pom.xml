@@ -8,15 +8,15 @@
     </parent>
 
     <modelVersion>4.0.0</modelVersion>
-    <groupId>org.jasig.service.persondir</groupId>
+    <groupId>org.jasig.ssp.service.persondir</groupId>
     <artifactId>person-directory-parent</artifactId>
     <packaging>pom</packaging>
     <version>1.5.2-SNAPSHOT</version>
     
     <scm>
-        <connection>scm:git:git://github.com/Jasig/person-directory.git</connection>
-        <developerConnection>scm:git:git@github.com:Jasig/person-directory.git</developerConnection>
-        <url>https://github.com/Jasig/person-directory</url>
+        <connection>scm:git:git://github.com/dmccallum/person-directory.git</connection>
+        <developerConnection>scm:git:git@github.com:dmccallum/person-directory.git</developerConnection>
+        <url>https://github.com/dmccallum/person-directory</url>
     </scm>
     
     <issueManagement>
