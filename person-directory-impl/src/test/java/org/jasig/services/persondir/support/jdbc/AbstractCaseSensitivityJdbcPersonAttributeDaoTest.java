@@ -302,4 +302,43 @@ public abstract class AbstractCaseSensitivityJdbcPersonAttributeDaoTest extends 
         assertEquals("andrew", currentResult.getAttributeValue("firstName"));
     }
 
+    // Guards against a bug discovered in the original SSP-1668/PERSONDIR-74
+    // patch where setting any caseInsensitiveDataAttributes config would
+    // cause all data attributes to be canonicalized
+    public void testCaseSensitiveNonUsernameAttributeQuery_OtherCaseInsensitiveDataAttributes() {
+        final AbstractJdbcPersonAttributeDao<Map<String, Object>> impl = newDao(testDataSource);
+        impl.setUseAllQueryAttributes(false);
+        final Map<String, Object> columnsToAttributes = new LinkedHashMap<String, Object>();
+        columnsToAttributes.put("netid", "username");
+        columnsToAttributes.put("name", "firstName");
+        columnsToAttributes.put("email", "emailAddr");
+        impl.setResultAttributeMapping(columnsToAttributes);
+        final Map<String, Object> attributesToColumns = new LinkedHashMap<String, Object>();
+        attributesToColumns.put("username", "netid");
+        attributesToColumns.put("firstName", "name");
+        attributesToColumns.put("emailAddr", "email");
+        impl.setQueryAttributeMapping(attributesToColumns);
+        impl.setCaseInsensitiveDataAttributesAsCollection(Util.genList("email"));
+        beforeNonUsernameQuery(impl);
+
+        Map<String,Object> wrongCase = new LinkedHashMap<String, Object>();
+        wrongCase.put("firstName", "ANDREW");
+        final Set<IPersonAttributes> wrongCaseResult = impl.getPeople(wrongCase);
+        assertEquals(0, wrongCaseResult.size());
+
+        Map<String,Object> correctCase = new LinkedHashMap<String, Object>();
+        correctCase.put("firstName", "Andrew");
+        final Set<IPersonAttributes> correctCaseResult = impl.getPeople(correctCase);
+        assertEquals(2, correctCaseResult.size());
+        Iterator<IPersonAttributes> correctCaseResultIterator = correctCaseResult.iterator();
+        IPersonAttributes currentResult = correctCaseResultIterator.next();
+        assertEquals("awp9", currentResult.getName());
+        // make sure it preserved data-layer casing
+        assertEquals("Andrew", currentResult.getAttributeValue("firstName"));
+        currentResult = correctCaseResultIterator.next();
+        assertEquals("atest", currentResult.getName());
+        // make sure it preserved data-layer casing
+        assertEquals("Andrew", currentResult.getAttributeValue("firstName"));
+    }
+
 }

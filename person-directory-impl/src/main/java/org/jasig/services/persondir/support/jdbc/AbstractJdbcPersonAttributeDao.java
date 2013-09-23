@@ -182,7 +182,7 @@ public abstract class AbstractJdbcPersonAttributeDao<R> extends AbstractQueryPer
      * @return
      */
     protected String canonicalizeDataAttributeForSql(String dataAttribute) {
-        if (this.caseInsensitiveDataAttributes == null || this.caseInsensitiveDataAttributes.isEmpty()) {
+        if (this.caseInsensitiveDataAttributes == null || this.caseInsensitiveDataAttributes.isEmpty() || !(this.caseInsensitiveDataAttributes.containsKey(dataAttribute))) {
             return dataAttribute;
         }
         if ( this.dataAttributeCaseCanonicalizationFunctions == null || this.dataAttributeCaseCanonicalizationFunctions.isEmpty() ) {
