@@ -96,6 +96,11 @@ public class SingleRowJdbcPersonAttributeDaoTest
     }
 
     @Override
+    protected boolean supportsPerDataAttributeCaseSensitivity() {
+        return true;
+    }
+
+    @Override
     protected void beforeNonUsernameQuery(AbstractJdbcPersonAttributeDao<Map<String, Object>> dao) {
         // no-op
     }

@@ -119,6 +119,11 @@ public class MultiRowJdbcPersonAttributeDaoTest
     }
 
     @Override
+    protected boolean supportsPerDataAttributeCaseSensitivity() {
+        return false;
+    }
+
+    @Override
     protected void beforeNonUsernameQuery(AbstractJdbcPersonAttributeDao<Map<String, Object>> dao) {
 
         // no processing method for caseInsensitiveResultAttributeMappings b/c
@@ -126,8 +131,7 @@ public class MultiRowJdbcPersonAttributeDaoTest
         // logical data layer attrib name has already occurred by the time
         // the case canonicalization kicks in
         processQueryAttributeMappingValues_BeforeNonUsernameQuery(dao);
-//        processCaseInsensitiveQueryAttributeMappingValues_BeforeNonUsernameQuery(dao);
-//        processCaseInsensitiveDataAttributeMappingValues_BeforeNonUsernameQuery(dao);
+        processCaseInsensitiveDataAttributeMappingValues_BeforeNonUsernameQuery(dao);
         dao.setUnmappedUsernameAttribute("netid");
     }
 
@@ -151,6 +155,26 @@ public class MultiRowJdbcPersonAttributeDaoTest
             newMappings.put(origMapping.getKey(), newMappingValue);
         }
         dao.setQueryAttributeMapping(newMappings);
+    }
+
+    protected void processCaseInsensitiveDataAttributeMappingValues_BeforeNonUsernameQuery(AbstractJdbcPersonAttributeDao<Map<String, Object>> dao) {
+        final Map<String, CaseCanonicalizationMode> origMappings = dao.getCaseInsensitiveDataAttributes();
+        if ( origMappings == null || origMappings.isEmpty() ) {
+            return;
+        }
+        final Map<String, CaseCanonicalizationMode> newMappings = new LinkedHashMap<String, CaseCanonicalizationMode>();
+        for ( Map.Entry<String,CaseCanonicalizationMode> origMapping : origMappings.entrySet() ) {
+            // that's right, it's all or nothing for the multi-row DAO w/r/t
+            // case sensitivity of non-username attribs b/c the canonicalization
+            // is based on data-layer attribute names, which are all the same for
+            // this DAO type.
+            if ( !("netid".equals(origMapping.getKey())) ) {
+                newMappings.put("attr_val", origMapping.getValue());
+            } else {
+                newMappings.put(origMapping.getKey(), origMapping.getValue());
+            }
+        }
+        dao.setCaseInsensitiveDataAttributes(newMappings);
     }
 
     
