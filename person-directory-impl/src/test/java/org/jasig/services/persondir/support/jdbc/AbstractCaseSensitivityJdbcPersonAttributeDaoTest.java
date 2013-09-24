@@ -38,6 +38,15 @@ public abstract class AbstractCaseSensitivityJdbcPersonAttributeDaoTest extends 
     protected abstract AbstractJdbcPersonAttributeDao<Map<String, Object>> newDao(DataSource dataSource);
     protected abstract void beforeNonUsernameQuery(AbstractJdbcPersonAttributeDao<Map<String, Object>> dao);
 
+    /**
+     * Some DAOs, e.g. {@link MultiRowJdbcPersonAttributeDao} cannot distinguish
+     * between mulitple data attributes for case canonicalization purposes,
+     * which invalidates some tests.
+     *
+     * @return
+     */
+    protected abstract boolean supportsPerDataAttributeCaseSensitivity();
+
     @Override
     protected void setUp() throws Exception {
         super.setUp();
@@ -222,7 +231,7 @@ public abstract class AbstractCaseSensitivityJdbcPersonAttributeDaoTest extends 
         // of preserving data-layer casing when mapping values out, even if
         // the original query on that field was case-insensitive
         impl.setCaseInsensitiveQueryAttributesAsCollection(Util.genList("firstName"));
-        impl.setCaseInsensitiveDataAttributesAsCollection(Util.genList("firstName"));
+        impl.setCaseInsensitiveDataAttributesAsCollection(Util.genList("name"));
         beforeNonUsernameQuery(impl);
 
         Map<String,Object> wrongCase = new LinkedHashMap<String, Object>();
@@ -269,7 +278,7 @@ public abstract class AbstractCaseSensitivityJdbcPersonAttributeDaoTest extends 
         // (actually same as non-_CanonicalizedResult except we do configure
         // a case-insensitive result query)
         impl.setCaseInsensitiveQueryAttributesAsCollection(Util.genList("firstName"));
-        impl.setCaseInsensitiveDataAttributesAsCollection(Util.genList("firstName"));
+        impl.setCaseInsensitiveDataAttributesAsCollection(Util.genList("name"));
         impl.setCaseInsensitiveResultAttributesAsCollection(Util.genList("firstName"));
         beforeNonUsernameQuery(impl);
 
@@ -306,6 +315,11 @@ public abstract class AbstractCaseSensitivityJdbcPersonAttributeDaoTest extends 
     // patch where setting any caseInsensitiveDataAttributes config would
     // cause all data attributes to be canonicalized
     public void testCaseSensitiveNonUsernameAttributeQuery_OtherCaseInsensitiveDataAttributes() {
+        if ( !(supportsPerDataAttributeCaseSensitivity()) ) {
+            // Some DAOs, e.g. MultiRowJdbcPersonAttributeDaoTest cannot distinguish
+            // between mulitple data attributes for case canonicalization purposes.
+            return;
+        }
         final AbstractJdbcPersonAttributeDao<Map<String, Object>> impl = newDao(testDataSource);
         impl.setUseAllQueryAttributes(false);
         final Map<String, Object> columnsToAttributes = new LinkedHashMap<String, Object>();
@@ -340,5 +354,6 @@ public abstract class AbstractCaseSensitivityJdbcPersonAttributeDaoTest extends 
         // make sure it preserved data-layer casing
         assertEquals("Andrew", currentResult.getAttributeValue("firstName"));
     }
+
 
 }
