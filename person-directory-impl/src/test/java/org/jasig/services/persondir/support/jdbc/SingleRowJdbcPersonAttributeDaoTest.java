@@ -32,14 +32,10 @@ import java.util.Set;
 
 import javax.sql.DataSource;
 
-import org.hsqldb.jdbcDriver;
 import org.jasig.services.persondir.support.AbstractDefaultAttributePersonAttributeDao;
-import org.jasig.services.persondir.support.AbstractDefaultQueryPersonAttributeDaoTest;
 import org.jasig.services.persondir.support.SimpleUsernameAttributeProvider;
 import org.jasig.services.persondir.util.Util;
 import org.springframework.dao.IncorrectResultSizeDataAccessException;
-import org.springframework.jdbc.core.ConnectionCallback;
-import org.springframework.jdbc.datasource.SimpleDriverDataSource;
 
 /**
  * Test the {@link SingleRowJdbcPersonAttributeDao} against a dummy DataSource.
@@ -49,7 +45,7 @@ import org.springframework.jdbc.datasource.SimpleDriverDataSource;
  * @version $Revision$ $Date$
  */
 public class SingleRowJdbcPersonAttributeDaoTest 
-    extends AbstractCaseSensitivityJdbcPersonAttributeDaoTest {
+    extends AbstractJdbcPersonAttributeDaoTest {
 
     @Override
     protected void setUpSchema(DataSource dataSource) throws SQLException {
@@ -198,6 +194,8 @@ public class SingleRowJdbcPersonAttributeDaoTest
 
         columnsToAttributes.put("email", "emailAddress");
         impl.setResultAttributeMapping(columnsToAttributes);
+
+        impl.setUsernameDataAttribute("netid");
 
         Map<String, List<Object>> attribs = impl.getMultivaluedUserAttributes("awp9");
         assertEquals(Util.list("andrew.petro@yale.edu"), attribs.get("emailAddress"));

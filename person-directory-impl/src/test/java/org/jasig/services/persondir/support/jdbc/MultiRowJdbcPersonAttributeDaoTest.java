@@ -30,15 +30,11 @@ import java.util.Set;
 
 import javax.sql.DataSource;
 
-import org.hsqldb.jdbcDriver;
 import org.jasig.services.persondir.support.AbstractDefaultAttributePersonAttributeDao;
-import org.jasig.services.persondir.support.AbstractDefaultQueryPersonAttributeDaoTest;
 import org.jasig.services.persondir.support.SimpleUsernameAttributeProvider;
 import org.jasig.services.persondir.util.CaseCanonicalizationMode;
 import org.jasig.services.persondir.util.Util;
 import org.springframework.jdbc.BadSqlGrammarException;
-import org.springframework.jdbc.core.ConnectionCallback;
-import org.springframework.jdbc.datasource.SimpleDriverDataSource;
 
 /**
  * Test the {@link MultiRowJdbcPersonAttributeDao} against a dummy DataSource.
@@ -48,7 +44,7 @@ import org.springframework.jdbc.datasource.SimpleDriverDataSource;
  * @version $Revision$ $Date$
  */
 public class MultiRowJdbcPersonAttributeDaoTest 
-    extends AbstractCaseSensitivityJdbcPersonAttributeDaoTest {
+    extends AbstractJdbcPersonAttributeDaoTest {
 
     @Override
     protected void setUpSchema(DataSource dataSource) throws SQLException {
@@ -132,6 +128,7 @@ public class MultiRowJdbcPersonAttributeDaoTest
         // the case canonicalization kicks in
         processQueryAttributeMappingValues_BeforeNonUsernameQuery(dao);
         processCaseInsensitiveDataAttributeMappingValues_BeforeNonUsernameQuery(dao);
+        processWildcardedDataAttributeExclusions_BeforeNonUsernameQuery(dao);
         dao.setUnmappedUsernameAttribute("netid");
     }
 
@@ -175,6 +172,15 @@ public class MultiRowJdbcPersonAttributeDaoTest
             }
         }
         dao.setCaseInsensitiveDataAttributes(newMappings);
+    }
+
+    protected void processWildcardedDataAttributeExclusions_BeforeNonUsernameQuery(AbstractJdbcPersonAttributeDao<Map<String, Object>> dao) {
+        final Set<String> exclusions = dao.getWildcardedDataAttributeExclusions();
+        if ( exclusions == null || exclusions.isEmpty() ) {
+            return;
+        }
+        // again, all or nothing w/r/t data-layer attrib config for a multi-row DAO
+        dao.setWildcardedDataAttributeExclusions(Collections.singleton("attr_val"));
     }
 
     

@@ -169,10 +169,17 @@ public class MultiRowJdbcPersonAttributeDao extends AbstractJdbcPersonAttributeD
         final Map<String, Map<String, List<Object>>> peopleAttributesBuilder = LazyMap.decorate(new LinkedHashMap<String, Map<String, List<Object>>>(), new LinkedHashMapFactory<String, List<Object>>());
 
         final String userNameAttribute = this.getConfiguredUserNameAttribute();
+        final String userNameDataAttribute = this.getConfiguredUsernameDataAttribute();
         
         for (final Map<String, Object> queryResult : queryResults) {
             final String userName;  // Choose a username from the best available option
-            if (this.isUserNameAttributeConfigured() && queryResult.containsKey(userNameAttribute)) {
+            if (this.isUsernameDataAttributeConfigured() && queryResult.containsKey(userNameDataAttribute)) {
+                // Option #0: A *data* attribute is named explicitly in the config,
+                // and that attribute is present in the results from the data layer;
+                // use it
+                final Object userNameValue = queryResult.get(userNameDataAttribute);
+                userName = userNameValue.toString();
+            } else if (this.isUserNameAttributeConfigured() && queryResult.containsKey(userNameAttribute)) {
                 // Option #1:  An attribute is named explicitly in the config, 
                 // and that attribute is present in the results from LDAP;  use it
                 final Object userNameValue = queryResult.get(userNameAttribute);
