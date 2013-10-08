@@ -26,6 +26,7 @@ import java.util.HashMap;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
@@ -79,9 +80,12 @@ public abstract class AbstractJdbcPersonAttributeDao<R> extends AbstractQueryPer
     private final String queryTemplate;
     private QueryType queryType = QueryType.AND;
     private Map<String,CaseCanonicalizationMode> caseInsensitiveDataAttributes;
-
     private Map<CaseCanonicalizationMode,MessageFormat> dataAttributeCaseCanonicalizationFunctions = DEFAULT_DATA_ATTRIBUTE_CASE_CANONICALIZATION_FUNCTIONS;
-    
+    private boolean wildcardDataAttributes = false; // false preserves historical behavior, true makes it work more like uPortal
+    private Set<String> wildcardedDataAttributeExclusions; // null/empty set preserves historical behavior, true makes it work more like uPortal
+    private boolean allowUsernameWildcards = true; // true preserves historical behavior, true makes it work more like uPortal
+    private String usernameDataAttribute;
+
     /**
      * @param ds The DataSource to use for queries
      * @param queryTemplate Template to use for SQL query generation. Use {0} as the placeholder for where the generated portion of the WHERE clause should be inserted. 
@@ -147,8 +151,28 @@ public abstract class AbstractJdbcPersonAttributeDao<R> extends AbstractQueryPer
                 }
 
                 //Convert to SQL wildcard
+                String formattedQueryValue = queryString;
+                final String usernameDataAttribute = this.getConfiguredUsernameDataAttribute();
+                boolean isUsernameDataAttribute = dataAttribute != null && dataAttribute.equalsIgnoreCase(usernameDataAttribute);
                 final Matcher queryValueMatcher = IPersonAttributeDao.WILDCARD_PATTERN.matcher(queryString);
-                final String formattedQueryValue = queryValueMatcher.replaceAll("%");
+                // Weird nested ifs here to try to match the structure of LdapPersonAttributeDao.
+                // Original version had fewer, more complex boolean expressions, which proved
+                // difficult to port to LdapPersonAttributeDao. The latter ended up with a much
+                // less clever, but I think more readable impl, which I decided to port back here.
+                if ( isUsernameDataAttribute ) {
+                    if ( queryValueMatcher.find() ) {
+                        if ( allowUsernameWildcards ) {
+                            formattedQueryValue = queryValueMatcher.replaceAll("%"); // this includes a Matcher.reset()
+                        }
+                    } // we honor user-specific wildcards if that feature is enabled, but we
+                      // never automatically wrap username attrib in wildcards on our own
+                } else {
+                    if ( queryValueMatcher.find() ) {
+                        formattedQueryValue = queryValueMatcher.replaceAll("%"); // this includes a Matcher.reset()
+                    } else if ( wildcardDataAttributes && ((wildcardedDataAttributeExclusions == null) || !(wildcardedDataAttributeExclusions.contains(dataAttribute))) ) {
+                        formattedQueryValue = "%" + queryString + "%";
+                    }
+                }
                 
                 queryBuilder.arguments.add(formattedQueryValue);
                 if (dataAttribute != null) {
@@ -271,6 +295,97 @@ public abstract class AbstractJdbcPersonAttributeDao<R> extends AbstractQueryPer
 
     public Map<CaseCanonicalizationMode, MessageFormat> getDataAttributeCaseCanonicalizationFunctions() {
         return dataAttributeCaseCanonicalizationFunctions;
+    }
+
+    public boolean isAllowUsernameWildcards() {
+        return allowUsernameWildcards;
+    }
+
+    public void setAllowUsernameWildcards(boolean allowUsernameWildcards) {
+        this.allowUsernameWildcards = allowUsernameWildcards;
+    }
+
+
+    public boolean isWildcardDataAttributes() {
+        return wildcardDataAttributes;
+    }
+
+    /**
+     * If {@code true}, searches on non-username attributes will be wrapped in
+     * wildcards unless the predicate already contains at least one wildcard or
+     * searched-on <em>data</em> attribute is listed in
+     * {@code wildcardedDataAttributeExclusions}. Defaults
+     * to {@link false}, which preserves historical behavior. Set to {@code true}
+     * for more consistent behavior w/r/t uPortal's internal person DAO. Setting
+     * to true does, of course, typically eliminate the value of any indices you
+     * may have in the underlying data store.
+     *
+     * @param wildcardDataAttributes
+     */
+    public void setWildcardDataAttributes(boolean wildcardDataAttributes) {
+        this.wildcardDataAttributes = wildcardDataAttributes;
+    }
+
+    public Set<String> getWildcardedDataAttributeExclusions() {
+        return wildcardedDataAttributeExclusions;
+    }
+
+    /**
+     * If {@code wildcardDataAttributes} is {@code true}, all non-username
+     * search predicate values will be wrapped in wildcards except for the
+     * data-layer attributes listed here. This is especially useful for
+     * multi-valued LDAP attributes which typically do not support wildcarded
+     * searches.
+     *
+     * @param wildcardedDataAttributeExclusions
+     */
+    public void setWildcardedDataAttributeExclusions(Set<String> wildcardedDataAttributeExclusions) {
+        this.wildcardedDataAttributeExclusions = wildcardedDataAttributeExclusions;
+    }
+
+    /**
+     * Was a username <em>data</em> attribute explicitly configured. I.e.
+     * if {@code true}, you know {@link #getConfiguredUsernameDataAttribute()}
+     * is not going to fall back to {@link #getConfiguredUserNameAttribute()}.
+     *
+     * @return
+     */
+    public boolean isUsernameDataAttributeConfigured() {
+        return getUsernameDataAttribute() != null;
+    }
+
+    /**
+     * Get the currently configured username <em>data</em> attribute, if any,
+     * falling back to the currently configured username app attribute
+     * ({@link #getConfiguredUserNameAttribute()}).
+     *
+     * <p>This property is duplicated in the LDAP DAO because, while it could
+     * theoretically be factored into their shared parent class
+     * ({@link AbstractQueryPersonAttributeDao}), that class doesn't actually
+     * do anything with the property, so exposing it as config at that level
+     * is technically incorrect. The same duplicating treatment is given
+     * to other wildcarding-related properties because their handling is
+     * specific to data-layer attribute processing which means it is
+     * specific to concrete DAOs (currently, anyway).</p>
+     *
+     * @return
+     */
+    public String getConfiguredUsernameDataAttribute() {
+        if ( !(isUsernameDataAttributeConfigured()) ) {
+            // Almost certainly not what you want, but in the rare case where
+            // the app- and data-layer usernames have the same name, this
+            // can save you a small amount of config.
+            return getConfiguredUserNameAttribute();
+        }
+        return getUsernameDataAttribute();
+    }
+
+    public String getUsernameDataAttribute() {
+        return usernameDataAttribute;
+    }
+
+    public void setUsernameDataAttribute(String usernameDataAttribute) {
+        this.usernameDataAttribute = usernameDataAttribute;
     }
 
 }

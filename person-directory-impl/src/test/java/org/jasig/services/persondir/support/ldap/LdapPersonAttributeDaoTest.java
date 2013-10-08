@@ -22,10 +22,13 @@ package org.jasig.services.persondir.support.ldap;
 import java.util.Collections;
 import java.util.HashMap;
 import java.util.HashSet;
+import java.util.Iterator;
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
 
+import org.jasig.services.persondir.IPersonAttributes;
 import org.jasig.services.persondir.util.Util;
 import org.springframework.beans.factory.BeanCreationException;
 import org.springframework.core.io.ClassPathResource;
@@ -74,7 +77,7 @@ public class LdapPersonAttributeDaoTest extends AbstractDirContextTest {
         ldapAttribsToPortalAttribs.put("mail", "email");
         
         impl.setResultAttributeMapping(ldapAttribsToPortalAttribs);
-        
+
         impl.setContextSource(this.getContextSource());
         
         impl.setQueryAttributeMapping(Collections.singletonMap("uid", null));
@@ -344,4 +347,343 @@ public class LdapPersonAttributeDaoTest extends AbstractDirContextTest {
             //expected
         }
     }
+
+    // All of the following wildcard-related tests were copy/pasted from
+    // AbstractJdbcPersonAttributeDaoTest. Given that this LDAP test class
+    // extends AbstractDirContextTest, it was going to be too complicated to
+    // find a way to mix-in these tests to both hierarchies. Though it would
+    // be nice to do so (and for both the wildcarding and case-sensitivity
+    // tests). Also note that both sets of tests have very different underlying
+    // datasets in their persistent fixtures.
+    public void testConfiguredDoubleEndedWildcards_NonUsernameQuery() throws Exception {
+        LdapPersonAttributeDao impl = newDao();
+        impl.setUseAllQueryAttributes(false);
+        final Map<String, Object> columnsToAttributes = new LinkedHashMap<String, Object>();
+        columnsToAttributes.put("uid", "username");
+        columnsToAttributes.put("sn", "lastName");
+        impl.setResultAttributeMapping(columnsToAttributes);
+        final Map<String, Object> attributesToColumns = new LinkedHashMap<String, Object>();
+        attributesToColumns.put("username", "uid");
+        attributesToColumns.put("lastName", "sn");
+        impl.setQueryAttributeMapping(attributesToColumns);
+        impl.setWildcardDataAttributes(true); // key config difference
+        impl.setUsernameDataAttribute("uid"); // key config point (without this, doesn't know when it's
+                                              // looking at a username search term (specifically, will revert to
+                                              // using the default app-layer username attribute, which
+                                              // is almost always pointless when processing data-layer attributes
+                                              // (which is when these wildcards are applied))
+        impl.afterPropertiesSet();
+
+        Map<String,Object> partialMatchQuery = new LinkedHashMap<String, Object>();
+        partialMatchQuery.put("lastName", "alquis"); // missing letters on both ends
+        final Set<IPersonAttributes> result = impl.getPeople(partialMatchQuery);
+        assertEquals(1, result.size());
+        Iterator<IPersonAttributes> resultIterator = result.iterator();
+        IPersonAttributes currentResult = resultIterator.next();
+        assertEquals("edalquist", currentResult.getName());
+        assertEquals("Dalquist", currentResult.getAttributeValue("lastName"));
+    }
+
+    public void testConfiguredDoubleEndedWildcards_NonUsernameQuery_ExcludedAttribute() throws Exception {
+        LdapPersonAttributeDao impl = newDao();
+        impl.setUseAllQueryAttributes(false);
+        final Map<String, Object> columnsToAttributes = new LinkedHashMap<String, Object>();
+        columnsToAttributes.put("uid", "username");
+        columnsToAttributes.put("sn", "lastName");
+        impl.setResultAttributeMapping(columnsToAttributes);
+        final Map<String, Object> attributesToColumns = new LinkedHashMap<String, Object>();
+        attributesToColumns.put("username", "uid");
+        attributesToColumns.put("lastName", "sn");
+        impl.setQueryAttributeMapping(attributesToColumns);
+        impl.setWildcardDataAttributes(true); // key config difference
+        impl.setUsernameDataAttribute("uid"); // key config point (without this, doesn't know when it's
+                                              // looking at a username search term (specifically, will revert to
+                                              // using the default app-layer username attribute, which
+                                              // is almost always pointless when processing data-layer attributes
+                                              // (which is when these wildcards are applied))
+        impl.setWildcardedDataAttributeExclusions(Collections.singleton("sn")); // key config point
+        impl.afterPropertiesSet();
+
+        // This test really only makes sense when paired with
+        // testConfiguredDoubleEndedWildcards_NonUsernameQuery(), which verifies
+        // that you *do* get results when you haven't excluded firstName from
+        // wildcarding
+        Map<String,Object> partialMatchQuery = new LinkedHashMap<String, Object>();
+        partialMatchQuery.put("lastName", "alquis"); // missing letters on both ends
+        final Set<IPersonAttributes> result = impl.getPeople(partialMatchQuery);
+        assertEquals(0, result.size());
+    }
+
+    public void testSingleUserSpecifiedWildcard_DoubleEndedWildcardsEnabled() throws Exception {
+        LdapPersonAttributeDao impl = newDao();
+        impl.setUseAllQueryAttributes(false);
+        final Map<String, Object> columnsToAttributes = new LinkedHashMap<String, Object>();
+        columnsToAttributes.put("uid", "username");
+        columnsToAttributes.put("sn", "lastName");
+        impl.setResultAttributeMapping(columnsToAttributes);
+        final Map<String, Object> attributesToColumns = new LinkedHashMap<String, Object>();
+        attributesToColumns.put("username", "uid");
+        attributesToColumns.put("lastName", "sn");
+        impl.setQueryAttributeMapping(attributesToColumns);
+        impl.setWildcardDataAttributes(true); // key config point
+        impl.setUsernameDataAttribute("uid"); // key config point (without this, doesn't know when it's
+                                              // looking at a username search term (specifically, will revert to
+                                              // using the default app-layer username attribute, which
+                                              // is almost always pointless when processing data-layer attributes
+                                              // (which is when these wildcards are applied))
+        impl.afterPropertiesSet();
+
+
+        Map<String,Object> internalWildcardQuery = new LinkedHashMap<String, Object>();
+        internalWildcardQuery.put("lastName", "Dal*uist");
+        Set<IPersonAttributes> result = impl.getPeople(internalWildcardQuery);
+        assertEquals(1, result.size());
+        Iterator<IPersonAttributes> resultIterator = result.iterator();
+        IPersonAttributes currentResult = resultIterator.next();
+        assertEquals("edalquist", currentResult.getName());
+        assertEquals("Dalquist", currentResult.getAttributeValue("lastName"));
+
+        // now make sure the app isn't sneaking wildcards onto the ends, even tho
+        // that feature is enabled (the user-specified wildcards should take
+        // precedence)
+        Map<String,Object> missingCharsQuery = new LinkedHashMap<String, Object>();
+        missingCharsQuery.put("lastName", "al*uis");
+        result = impl.getPeople(missingCharsQuery);
+        assertEquals(0, result.size());
+    }
+
+
+    public void testSingleUserSpecifiedWildcard_DoubleEndedWildcardsDisabled() throws Exception {
+        LdapPersonAttributeDao impl = newDao();
+        impl.setUseAllQueryAttributes(false);
+        final Map<String, Object> columnsToAttributes = new LinkedHashMap<String, Object>();
+        columnsToAttributes.put("uid", "username");
+        columnsToAttributes.put("sn", "lastName");
+        impl.setResultAttributeMapping(columnsToAttributes);
+        final Map<String, Object> attributesToColumns = new LinkedHashMap<String, Object>();
+        attributesToColumns.put("username", "uid");
+        attributesToColumns.put("lastName", "sn");
+        impl.setQueryAttributeMapping(attributesToColumns);
+        impl.setWildcardDataAttributes(false); // key config difference
+        impl.setUsernameDataAttribute("uid"); // key config point (without this, doesn't know when it's
+                                              // looking at a username search term (specifically, will revert to
+                                              // using the default app-layer username attribute, which
+                                              // is almost always pointless when processing data-layer attributes
+                                              // (which is when these wildcards are applied))
+        impl.afterPropertiesSet();
+
+
+        Map<String,Object> internalWildcardQuery = new LinkedHashMap<String, Object>();
+        internalWildcardQuery.put("lastName", "Dal*uist");
+        Set<IPersonAttributes> result = impl.getPeople(internalWildcardQuery);
+        assertEquals(1, result.size());
+        Iterator<IPersonAttributes> resultIterator = result.iterator();
+        IPersonAttributes currentResult = resultIterator.next();
+        assertEquals("edalquist", currentResult.getName());
+        assertEquals("Dalquist", currentResult.getAttributeValue("lastName"));
+
+        // now make sure the app isn't sneaking wildcards onto the ends, even tho
+        // that feature is enabled (the user-specified wildcards should take
+        // precedence)
+        Map<String,Object> missingCharsQuery = new LinkedHashMap<String, Object>();
+        missingCharsQuery.put("lastName", "al*uis");
+        result = impl.getPeople(missingCharsQuery);
+        assertEquals(0, result.size());
+    }
+
+    public void testMulitpleUserSpecifiedWildcards_DoubleEndedWildcardsEnabled() throws Exception {
+        LdapPersonAttributeDao impl = newDao();
+        impl.setUseAllQueryAttributes(false);
+        final Map<String, Object> columnsToAttributes = new LinkedHashMap<String, Object>();
+        columnsToAttributes.put("uid", "username");
+        columnsToAttributes.put("sn", "lastName");
+        impl.setResultAttributeMapping(columnsToAttributes);
+        final Map<String, Object> attributesToColumns = new LinkedHashMap<String, Object>();
+        attributesToColumns.put("username", "uid");
+        attributesToColumns.put("lastName", "sn");
+        impl.setQueryAttributeMapping(attributesToColumns);
+        impl.setWildcardDataAttributes(true); // key config point
+        impl.setUsernameDataAttribute("uid"); // key config point (without this, doesn't know when it's
+                                              // looking at a username search term (specifically, will revert to
+                                              // using the default app-layer username attribute, which
+                                              // is almost always pointless when processing data-layer attributes
+                                              // (which is when these wildcards are applied))
+        impl.afterPropertiesSet();
+
+
+        Map<String,Object> internalWildcardQuery = new LinkedHashMap<String, Object>();
+        internalWildcardQuery.put("lastName", "Da*q*ist");
+        Set<IPersonAttributes> result = impl.getPeople(internalWildcardQuery);
+        assertEquals(1, result.size());
+        Iterator<IPersonAttributes> resultIterator = result.iterator();
+        IPersonAttributes currentResult = resultIterator.next();
+        assertEquals("edalquist", currentResult.getName());
+        assertEquals("Dalquist", currentResult.getAttributeValue("lastName"));
+
+    }
+
+    public void testMulitpleUserSpecifiedWildcards_DoubleEndedWildcardsDisabled() throws Exception {
+        LdapPersonAttributeDao impl = newDao();
+        impl.setUseAllQueryAttributes(false);
+        final Map<String, Object> columnsToAttributes = new LinkedHashMap<String, Object>();
+        columnsToAttributes.put("uid", "username");
+        columnsToAttributes.put("sn", "lastName");
+        impl.setResultAttributeMapping(columnsToAttributes);
+        final Map<String, Object> attributesToColumns = new LinkedHashMap<String, Object>();
+        attributesToColumns.put("username", "netid");
+        attributesToColumns.put("lastName", "sn");
+        impl.setQueryAttributeMapping(attributesToColumns);
+        impl.setWildcardDataAttributes(false); // key config point (but just reasserts the default)
+        impl.setUsernameDataAttribute("uid"); // key config point (without this, doesn't know when it's
+                                                // looking at a username search term (specifically, will revert to
+                                                // using the default app-layer username attribute, which
+                                                // is almost always pointless when processing data-layer attributes
+                                                // (which is when these wildcards are applied))
+        impl.afterPropertiesSet();
+
+        Map<String,Object> internalWildcardQuery = new LinkedHashMap<String, Object>();
+        internalWildcardQuery.put("lastName", "Da*q*ist");
+        Set<IPersonAttributes> result = impl.getPeople(internalWildcardQuery);
+        assertEquals(1, result.size());
+        Iterator<IPersonAttributes> resultIterator = result.iterator();
+        IPersonAttributes currentResult = resultIterator.next();
+        assertEquals("edalquist", currentResult.getName());
+        assertEquals("Dalquist", currentResult.getAttributeValue("lastName"));
+
+    }
+
+    public void testUserSpecifiedUsernameWildcards_UsernameWildcardsEnabled_DoubleEndedWildcardsEnabled() throws Exception {
+        LdapPersonAttributeDao impl = newDao();
+        impl.setUseAllQueryAttributes(false);
+        final Map<String, Object> columnsToAttributes = new LinkedHashMap<String, Object>();
+        columnsToAttributes.put("uid", "username");
+        impl.setResultAttributeMapping(columnsToAttributes);
+        final Map<String, Object> attributesToColumns = new LinkedHashMap<String, Object>();
+        attributesToColumns.put("username", "uid");
+        impl.setQueryAttributeMapping(attributesToColumns);
+        impl.setWildcardDataAttributes(true); // key config point
+        impl.setAllowUsernameWildcards(true); // key config point (but just reasserts the default)
+        impl.setUsernameDataAttribute("uid"); // key config point (without this, doesn't know when it's
+                                                // looking at a username search term (specifically, will revert to
+                                                // using the default app-layer username attribute, which
+                                                // is almost always pointless when processing data-layer attributes
+                                                // (which is when these wildcards are applied))
+        impl.afterPropertiesSet();
+
+        IPersonAttributes result = impl.getPerson("edal*uist");
+        assertNotNull(result);
+        assertEquals("edalquist", result.getName());
+
+        // make sure it's not just wrapping wildcards around the whole thing
+        result = impl.getPerson("l*");
+        assertNull(result);
+    }
+
+    public void testUserSpecifiedUsernameWildcards_UsernameWildcardsEnabled_DoubleEndedWildcardsDisabled() throws Exception {
+        LdapPersonAttributeDao impl = newDao();
+        impl.setUseAllQueryAttributes(false);
+        final Map<String, Object> columnsToAttributes = new LinkedHashMap<String, Object>();
+        columnsToAttributes.put("uid", "username");
+        impl.setResultAttributeMapping(columnsToAttributes);
+        final Map<String, Object> attributesToColumns = new LinkedHashMap<String, Object>();
+        attributesToColumns.put("username", "uid");
+        impl.setQueryAttributeMapping(attributesToColumns);
+        impl.setWildcardDataAttributes(false); // key config point (but just reasserts the default)
+        impl.setAllowUsernameWildcards(true); // key config point (but just reasserts the default)
+        impl.setUsernameDataAttribute("uid"); // key config point (without this, doesn't know when it's
+                                                // looking at a username search term (specifically, will revert to
+                                                // using the default app-layer username attribute, which
+                                                // is almost always pointless when processing data-layer attributes
+                                                // (which is when these wildcards are applied))
+        impl.afterPropertiesSet();
+
+        IPersonAttributes result = impl.getPerson("edal*uist");
+        assertNotNull(result);
+        assertEquals("edalquist", result.getName());
+
+        // make sure it's not just wrapping wildcards around the whole thing
+        result = impl.getPerson("l*");
+        assertNull(result);
+    }
+
+    public void testUserSpecifiedUsernameWildcards_UsernameWildcardsDisabled_DoubleEndedWildcardsEnabled() throws Exception {
+        LdapPersonAttributeDao impl = newDao();
+        impl.setUseAllQueryAttributes(false);
+        final Map<String, Object> columnsToAttributes = new LinkedHashMap<String, Object>();
+        columnsToAttributes.put("uid", "username");
+        impl.setResultAttributeMapping(columnsToAttributes);
+        final Map<String, Object> attributesToColumns = new LinkedHashMap<String, Object>();
+        attributesToColumns.put("username", "uid");
+        impl.setQueryAttributeMapping(attributesToColumns);
+        impl.setWildcardDataAttributes(true); // key config point
+        impl.setAllowUsernameWildcards(false); // key config point
+        impl.setUsernameDataAttribute("uid"); // key config point (without this, doesn't know when it's
+                                              // looking at a username search term (specifically, will revert to
+                                              // using the default app-layer username attribute, which
+                                              // is almost always pointless when processing data-layer attributes
+                                              // (which is when these wildcards are applied))
+        impl.afterPropertiesSet();
+
+        IPersonAttributes result = impl.getPerson("edal*uist");
+        assertNull(result);
+    }
+
+    public void testUserSpecifiedUsernameWildcards_UsernameWildcardsDisabled_DoubleEndedWildcardsDisabled() throws Exception {
+        LdapPersonAttributeDao impl = newDao();
+        impl.setUseAllQueryAttributes(false);
+        final Map<String, Object> columnsToAttributes = new LinkedHashMap<String, Object>();
+        columnsToAttributes.put("uid", "username");
+        impl.setResultAttributeMapping(columnsToAttributes);
+        final Map<String, Object> attributesToColumns = new LinkedHashMap<String, Object>();
+        attributesToColumns.put("username", "uid");
+        impl.setQueryAttributeMapping(attributesToColumns);
+        impl.setWildcardDataAttributes(false); // key config point (but just reasserts the default)
+        impl.setAllowUsernameWildcards(false); // key config point
+        impl.setUsernameDataAttribute("uid"); // key config point (without this, doesn't know when it's
+                                              // looking at a username search term (specifically, will revert to
+                                              // using the default app-layer username attribute, which
+                                              // is almost always pointless when processing data-layer attributes
+                                              // (which is when these wildcards are applied))
+        impl.afterPropertiesSet();
+
+        IPersonAttributes result = impl.getPerson("edal*uist");
+        assertNull(result);
+    }
+
+    public void testPartialInternalUsernameMatch_DoubleEndedWildcardsEnabled() throws Exception {
+        LdapPersonAttributeDao impl = newDao();
+        impl.setUseAllQueryAttributes(false);
+        final Map<String, Object> columnsToAttributes = new LinkedHashMap<String, Object>();
+        columnsToAttributes.put("uid", "username");
+        impl.setResultAttributeMapping(columnsToAttributes);
+        final Map<String, Object> attributesToColumns = new LinkedHashMap<String, Object>();
+        attributesToColumns.put("username", "uid");
+        impl.setQueryAttributeMapping(attributesToColumns);
+        impl.setWildcardDataAttributes(true); // key config point
+        impl.setUsernameDataAttribute("uid"); // key config point (without this, doesn't know when it's
+                                              // looking at a username search term (specifically, will revert to
+                                              // using the default app-layer username attribute, which
+                                              // is almost always pointless when processing data-layer attributes
+                                              // (which is when these wildcards are applied))
+        impl.afterPropertiesSet();
+
+        IPersonAttributes result = impl.getPerson("dalquis");
+        assertNull(result); // double-ended wildcarding config *never* applies to usernames,
+                            // even if no user-specified wildcards present in search term
+    }
+
+    /**
+     * Note that {@link org.jasig.services.persondir.support.ldap.LdapPersonAttributeDao#afterPropertiesSet()}
+     * has <em>not</em> been called on the returned instance. Assumes you
+     * probably have more config to set to prepare for your test.
+     *
+     * @return
+     */
+    protected LdapPersonAttributeDao newDao() {
+        LdapPersonAttributeDao impl = new LdapPersonAttributeDao();
+        impl.setContextSource(this.getContextSource());
+        return impl;
+    }
+
+
 }

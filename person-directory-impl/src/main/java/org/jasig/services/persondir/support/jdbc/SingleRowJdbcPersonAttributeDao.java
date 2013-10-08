@@ -100,7 +100,13 @@ public class SingleRowJdbcPersonAttributeDao extends AbstractJdbcPersonAttribute
             
             final IPersonAttributes person;
             final String userNameAttribute = this.getConfiguredUserNameAttribute();
-            if (this.isUserNameAttributeConfigured() && queryResult.containsKey(userNameAttribute)) {
+            final String userNameDataAttribute = this.getConfiguredUsernameDataAttribute();
+            if (this.isUsernameDataAttributeConfigured() && queryResult.containsKey(userNameDataAttribute)) {
+                // Option #0: A *data* attribute is named explicitly in the config,
+                // and that attribute is present in the results from the data layer;
+                // use it
+                person = new CaseInsensitiveAttributeNamedPersonImpl(userNameDataAttribute, multivaluedQueryResult);
+            } else if (this.isUserNameAttributeConfigured() && queryResult.containsKey(userNameAttribute)) {
                 // Option #1:  An attribute is named explicitly in the config, 
                 // and that attribute is present in the results from LDAP;  use it
                 person = new CaseInsensitiveAttributeNamedPersonImpl(userNameAttribute, multivaluedQueryResult);
